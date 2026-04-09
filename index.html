@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jordan Skole — Data Engineering & Product Leader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #0f0e0c;
+    --ink-muted: #5a5750;
+    --ink-faint: #a09d96;
+    --paper: #faf8f4;
+    --paper-warm: #f0ede5;
+    --rule: #d8d4cc;
+    --accent: #c4400c;
+    --accent-warm: #e8956d;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --serif: 'Playfair Display', serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-weight: 300;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* MASTHEAD */
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 2rem 4vw 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .masthead-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .masthead-name {
+    font-family: var(--serif);
+    font-size: clamp(4rem, 12vw, 9rem);
+    font-weight: 900;
+    line-height: 0.88;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.75rem;
+    position: relative;
+  }
+
+  .masthead-name em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .masthead-rule-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 0;
+  }
+
+  .masthead-rule-bar span {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    white-space: nowrap;
+  }
+
+  .masthead-rule-bar .dot {
+    width: 3px;
+    height: 3px;
+    background: var(--ink-faint);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .headline-bar {
+    padding: 1rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .headline-bar .tagline {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    color: var(--ink-muted);
+    max-width: 60ch;
+  }
+
+  .contact-links {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .contact-links a {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-muted);
+    text-decoration: none;
+    letter-spacing: 0.05em;
+    transition: color 0.15s;
+  }
+
+  .contact-links a:hover { color: var(--accent); }
+
+  /* MAIN GRID */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 0;
+    padding: 0 4vw;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .col-main {
+    border-right: 1px solid var(--rule);
+    padding-right: 3rem;
+    padding-top: 3rem;
+    padding-bottom: 4rem;
+  }
+
+  .col-side {
+    padding-left: 2.5rem;
+    padding-top: 3rem;
+    padding-bottom: 4rem;
+  }
+
+  /* SECTION HEADERS */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  /* ABOUT / LEDE */
+  .lede {
+    font-family: var(--serif);
+    font-size: clamp(1.1rem, 2vw, 1.35rem);
+    line-height: 1.55;
+    margin-bottom: 2.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .lede strong {
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* EXPERIENCE */
+  .experience-section { margin-bottom: 3rem; }
+
+  .job {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 0 2rem;
+    padding: 1.75rem 0;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+  }
+
+  .job:first-of-type { padding-top: 0; }
+
+  .job-meta {
+    padding-top: 2px;
+  }
+
+  .job-date {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .job-company {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink-muted);
+    font-weight: 500;
+    display: block;
+  }
+
+  .job-title {
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-bottom: 0.6rem;
+  }
+
+  .job-desc {
+    font-size: 0.875rem;
+    color: var(--ink-muted);
+    line-height: 1.65;
+    margin-bottom: 0.75rem;
+  }
+
+  .job-highlights {
+    list-style: none;
+    padding: 0;
+  }
+
+  .job-highlights li {
+    font-size: 0.83rem;
+    color: var(--ink-muted);
+    padding: 3px 0 3px 1rem;
+    position: relative;
+    line-height: 1.5;
+  }
+
+  .job-highlights li::before {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-size: 0.75rem;
+  }
+
+  .badge-acquired {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 2px 7px;
+    border-radius: 2px;
+    margin-left: 6px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  /* SIDEBAR */
+  .side-section { margin-bottom: 2.5rem; }
+
+  .side-section p {
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    line-height: 1.6;
+  }
+
+  /* SKILLS GRID */
+  .skills-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .skill-pill {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--rule);
+    padding: 4px 10px;
+    border-radius: 2px;
+    color: var(--ink-muted);
+    background: transparent;
+    transition: all 0.15s;
+    cursor: default;
+  }
+
+  .skill-pill:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: #fdf3ef;
+  }
+
+  /* TECH SKILLS */
+  .tech-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .tech-label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  .tech-list {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-muted);
+    line-height: 1.7;
+  }
+
+  /* QUOTE PULL */
+  .pull-quote {
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.25rem;
+    margin: 2rem 0;
+    background: var(--paper-warm);
+  }
+
+  .pull-quote p {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  /* STAT CARDS */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin-bottom: 2.5rem;
+  }
+
+  .stat-card {
+    background: var(--paper);
+    padding: 1.25rem 1rem;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-family: var(--serif);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+
+  .stat-number em { color: var(--accent); font-style: normal; }
+
+  .stat-desc {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 2px solid var(--ink);
+    padding: 1.5rem 4vw;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  footer span {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.08em;
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .masthead-name { animation: fadeUp 0.6s ease both; }
+  .masthead-rule-bar { animation: fadeUp 0.6s 0.1s ease both; }
+  .headline-bar { animation: fadeUp 0.6s 0.2s ease both; }
+  .lede { animation: fadeUp 0.6s 0.3s ease both; }
+
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .col-main { border-right: none; padding-right: 0; }
+    .col-side { padding-left: 0; border-top: 2px solid var(--ink); }
+    .headline-bar { flex-direction: column; align-items: flex-start; }
+    .contact-links { align-items: flex-start; }
+    .masthead-meta { flex-direction: column; gap: 4px; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .job { grid-template-columns: 1fr; gap: 0.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-meta">
+    <span>Jordan Skole &mdash; Portfolio &amp; Profile</span>
+    <span>Detroit Metro &nbsp;&bull;&nbsp; Software Development</span>
+  </div>
+
+  <div class="masthead-name">
+    Jordan<br><em>Skole</em>
+  </div>
+
+  <div class="masthead-rule-bar">
+    <span>Data Engineering</span><div class="dot"></div>
+    <span>Product Strategy</span><div class="dot"></div>
+    <span>Growth Engineering</span><div class="dot"></div>
+    <span>Fintech</span><div class="dot"></div>
+    <span>Player-Coach IC</span>
+  </div>
+
+  <div class="headline-bar">
+    <p class="tagline">12+ years turning data into growth&nbsp;— from SQL Server to DuckDB-WASM, from $15M to $100M ARR, from zero to bank-grade analytics.</p>
+    <nav class="contact-links">
+      <a href="mailto:jordan@skole.us">jordan@skole.us</a>
+      <a href="https://linkedin.com/in/jordanskole" target="_blank">linkedin.com/in/jordanskole</a>
+      <a href="http://jordanskole.com" target="_blank">jordanskole.com</a>
+    </nav>
+  </div>
+</header>
+
+<div class="main">
+  <main class="col-main">
+
+    <div class="section-label">About</div>
+
+    <p class="lede">
+      Player-coach data engineer and product leader with a track record of <strong>changing the slope of the growth curve</strong>. Partner and early employee at three companies: one acquired, one scaled from $15M to $100M ARR, one built from zero to a bank-grade analytics platform.
+    </p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-number"><em>3</em>x+</div>
+        <div class="stat-desc">User growth<br>at Autobooks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number"><em>10</em>x</div>
+        <div class="stat-desc">GMV growth<br>year over year</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number"><em>17</em></div>
+        <div class="stat-desc">Datasets powering<br>Autobooks Hub</div>
+      </div>
+    </div>
+
+    <div class="section-label">Experience</div>
+
+    <div class="experience-section">
+
+      <div class="job">
+        <div class="job-meta">
+          <span class="job-date">Aug 2021<br>Present</span>
+          <span class="job-company">Autobooks</span>
+        </div>
+        <div>
+          <div class="job-title">VP of Product Strategy</div>
+          <p class="job-desc">Partner at a Detroit fintech building invoicing and payment processing for SMBs via online banking.</p>
+          <ul class="job-highlights">
+            <li>Architected Autobooks Hub — an in-browser analytics platform consolidating Receivables, Capital, Accounting, and platform events into a single interface</li>
+            <li>Designed the full data pipeline: SQL Server → Azure Functions → Arrow IPC → Parquet → DuckDB-WASM, enabling instant client-side queries with zero server round-trips</li>
+            <li>Built a Claude-powered AI assistant that generates SQL from natural language; queries run entirely client-side, data never leaves the browser</li>
+            <li>Implemented a 122-permission scoped access system (verb:resource@scope) managed through Auth0 JWT tokens</li>
+            <li>Designed a Segment Protocols tracking plan with 150+ events across the full Hub user journey</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="job">
+        <div class="job-meta">
+          <span class="job-date">Aug 2018<br>Aug 2021</span>
+          <span class="job-company">Autobooks</span>
+        </div>
+        <div>
+          <div class="job-title">Director of Product Growth</div>
+          <p class="job-desc">Owned product analytics and growth engineering, building the data infrastructure to measure and optimize the SMB onboarding funnel.</p>
+          <ul class="job-highlights">
+            <li>Drove 3x+ acquired users, 5x+ active users, and 10x+ gross merchandise volume YoY</li>
+            <li>Integrated Autobooks with Segment CDP, establishing the event tracking foundation that now powers Hub analytics</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="job">
+        <div class="job-meta">
+          <span class="job-date">Sep 2016<br>Aug 2018</span>
+          <span class="job-company">ActiveCampaign</span>
+        </div>
+        <div>
+          <div class="job-title">Growth Engineer</div>
+          <p class="job-desc">Partner — joined at $15M ARR, departed at $100M ARR. Owned the full marketing automation stack as both engineer and power user.</p>
+          <ul class="job-highlights">
+            <li>Built complex multi-channel automation workflows processing millions of emails daily</li>
+            <li>Created developer education content including API tutorials with Serverless, AWS Lambda, and IoT hardware</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="job">
+        <div class="job-meta">
+          <span class="job-date">Jul 2013<br>Feb 2015</span>
+          <span class="job-company">Ambassador</span>
+        </div>
+        <div>
+          <div class="job-title">Director of Growth &amp; Marketing <span class="badge-acquired">Acquired</span></div>
+          <p class="job-desc">Early employee at a referral marketing platform; built and scaled growth and marketing through acquisition.</p>
+          <ul class="job-highlights">
+            <li>Integrated referral tracking with Salesforce, SendGrid, MailChimp, PayPal, and Dwolla</li>
+            <li>Owned the full marketing data stack: attribution, analytics, and automation</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="job">
+        <div class="job-meta">
+          <span class="job-date">Aug 2014<br>Sep 2015</span>
+          <span class="job-company">Detroit</span>
+        </div>
+        <div>
+          <div class="job-title">Founder, Benchmark Intelligence <span class="badge-acquired">Acquired</span></div>
+          <p class="job-desc">SaaS platform analyzing environmental and operational data to predict retail location revenue performance.</p>
+          <ul class="job-highlights">
+            <li>Built data pipelines ingesting from Google Places, Yelp, Foursquare, Facebook, and weather APIs into a unified analytics engine</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="pull-quote">
+      <p>"I can point to the chart and say — see where it changed from up and to the right to <em>UP AND TO THE RIGHT</em>? I did that."</p>
+    </div>
+
+    <div class="section-label" style="margin-top:2rem;">Education &amp; Affiliations</div>
+    <p style="font-size:0.875rem; color:var(--ink-muted); line-height:1.7;">
+      <strong style="font-weight:500; color:var(--ink);">Michigan State University</strong><br>
+      The Brandery — Accelerator, Alumni<br>
+      i3 Detroit — Hackerspace, Member
+    </p>
+
+  </main>
+
+  <aside class="col-side">
+
+    <div class="side-section">
+      <div class="section-label">Technical Skills</div>
+
+      <div class="tech-group">
+        <span class="tech-label">Data</span>
+        <div class="tech-list">SQL · KQL (Kusto) · DuckDB<br>Apache Arrow / Parquet<br>ETL pipeline design<br>Azure Data Explorer</div>
+      </div>
+
+      <div class="tech-group">
+        <span class="tech-label">Backend</span>
+        <div class="tech-list">Node.js · TypeScript · Python<br>Azure Functions · Blob Storage<br>Auth0 / JWT · REST APIs</div>
+      </div>
+
+      <div class="tech-group">
+        <span class="tech-label">Frontend</span>
+        <div class="tech-list">React · TypeScript<br>DuckDB-WASM · OPFS<br>SVG charting · XState</div>
+      </div>
+
+      <div class="tech-group">
+        <span class="tech-label">Platform</span>
+        <div class="tech-list">Azure (ADX, Functions, Blob)<br>Segment CDP · Protocols<br>FullStory · CI/CD · IaC</div>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <div class="section-label">Expertise</div>
+      <div class="skills-grid">
+        <span class="skill-pill">Data Engineering</span>
+        <span class="skill-pill">Product Management</span>
+        <span class="skill-pill">Product Strategy</span>
+        <span class="skill-pill">Growth Engineering</span>
+        <span class="skill-pill">UX Research</span>
+        <span class="skill-pill">Leadership</span>
+        <span class="skill-pill">Marketing Automation</span>
+        <span class="skill-pill">Entrepreneurship</span>
+        <span class="skill-pill">Go-to-Market</span>
+        <span class="skill-pill">SDLC</span>
+        <span class="skill-pill">Digital Marketing</span>
+        <span class="skill-pill">JavaScript</span>
+        <span class="skill-pill">Node.js</span>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <div class="section-label">Highlight</div>
+      <p>Designed a full in-browser analytics stack moving data from SQL Server through Arrow IPC into DuckDB-WASM — instant client-side queries across 17 datasets with no server round-trips.</p>
+    </div>
+
+    <div class="side-section">
+      <div class="section-label">Currently</div>
+      <p>VP of Product Strategy at Autobooks, Detroit Metro. Open to conversations about data-heavy product challenges.</p>
+      <p style="margin-top:0.75rem;">
+        <a href="mailto:jordan@skole.us" style="font-family:var(--mono); font-size:0.7rem; color:var(--accent); text-decoration:none; letter-spacing:0.05em;">jordan@skole.us →</a>
+      </p>
+    </div>
+
+  </aside>
+</div>
+
+<footer>
+  <span>Jordan Skole &mdash; Detroit Metro</span>
+  <span>jordan@skole.us</span>
+</footer>
+
+</body>
+</html>
