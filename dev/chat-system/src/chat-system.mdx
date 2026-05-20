@@ -1,0 +1,214 @@
+import SystemPromptExplorer from "./components/SystemPromptExplorer";
+import ToolCatalog from "./components/ToolCatalog";
+import ToolCallTimeline from "./components/ToolCallTimeline";
+import PiiViewer from "./components/PiiViewer";
+import "./styles.css";
+
+<div className="cs-doc">
+
+# How the chat works
+
+*A deeper-than-the-wiki walkthrough of the LLM-powered chat panel inside Autobooks Hub.*
+
+<div className="cs-tldr">
+
+**Audience.** This document is for someone who isn't going to write the code, but wants to know exactly what the system does — what data it sees, what it doesn't see, what guarantees it makes about customer information, and how it stays inside its lane.
+
+**The shape of the system.** A React panel in the bank-employee portal talks to Claude (specifically `claude-sonnet-4-6`) running on Azure AI Foundry. The Azure Function in between is mostly a pass-through that translates one streaming protocol into another. The interesting work — running SQL against the bank's data, building charts, deciding whether to navigate — happens entirely in the user's browser. The LLM directs; the browser executes.
+
+</div>
+
+## 1. The thirty-second version
+
+When a bank employee types a question, it travels through five stops. Three of them are inside their own browser.
+
+<pre className="cs-flow">
+┌──────────────┐      POST /v1/chat        ┌─────────────────────┐
+│   Browser    │ ────────────────────────▶ │   Azure Function    │
+│              │      (SSE response)       │  (apps/functions)   │
+│  ChatPanel   │ ◀──────────────────────── │                     │
+│  DuckDB-WASM │                           └──────────┬──────────┘
+│  ChatMessage │                                      │
+│     ↑                                               ▼
+│     │   tool result          ┌───────────────────────────────────┐
+│     └────────────────────────│  Claude on Azure AI Foundry       │
+│   (browser runs the SQL)     │  (Anthropic SDK, streaming)       │
+│                              └───────────────────────────────────┘
+</pre>
+
+1. The user types **"who's our top SMB by revenue this month?"**
+2. The browser POSTs the message (plus a small, optional "page context" string) to the Azure Function.
+3. The function loads the cached system prompt, hands the conversation to Claude, and translates Claude's streaming output into an SSE event stream the browser knows how to read.
+4. Claude decides it needs to run a SQL query. It emits a `query_data` tool call. The function relays the tool call to the browser as a `CUSTOM(tool-input-available)` event.
+5. The browser runs the SQL against an **in-browser** DuckDB-WASM database, redacts PII columns, and ships the result back. Claude reads the result and writes the final answer.
+
+No customer data is ever sent to Anthropic in its raw form. What Claude sees instead is `[REDACTED_1]`, `[REDACTED_2]`, and so on — opaque tokens that map back to real names only inside the user's browser.
+
+## 2. Why this shape?
+
+There were three other plausible shapes and I passed on all of them. It's worth a paragraph on each:
+
+**"Just run the SQL on the server."** That would mean either (a) the LLM sees the raw values directly, or (b) the server applies the same token map. I rejected (a) on privacy grounds. I rejected (b) because the Hub already has a DuckDB instance in the browser — used by every dashboard and the SMB detail pages — and re-running the same query on the server side would double the cost and the latency.
+
+**"Send the whole dataset to the LLM."** Claude's context window is large enough to swallow tens of thousands of rows, but it's wildly expensive and slow, and most of the data isn't relevant to most questions. Better to let Claude ask focused questions of the data.
+
+**"Build a custom RAG pipeline."** RAG is great for documents. It's clumsy for structured tabular data — you end up turning rows into prose so the embedding model can find them. I have a real database and a real LLM; I let them talk in their native language (SQL).
+
+What I ended up with is what the literature now calls **agentic tool use** — the LLM has a small, well-typed set of tools, and I let it decide when to call them. The contract is enforced by the tool's JSON schema and by what the function actually does when it receives the call.
+
+## 3. The system prompt: what Claude knows before it sees your message
+
+Every time the user sends a message, Claude receives a system prompt of roughly 2,400 tokens. Most of it is the same on every call — voice/tone rules, visualization guidance, PII conventions, forecasting recipes, the data model. The only thing that varies request-to-request is an optional **page-context** block that tells Claude where in the app the user is currently looking.
+
+Below: every section of the prompt, with a one-line explainer of what it's for. Click a section to expand it.
+
+<SystemPromptExplorer />
+
+Two things to flag here:
+
+- The prompt is built **once** at module load time (when the Azure Function starts up) and cached. I don't rebuild it on every request — the model is a stable artifact and the dataset definitions don't change between deploys.
+- The forecasting section is the longest by far, and it exists for a single behavioral reason: without it, Claude declines forecasting questions with "I'm a language model, not a forecasting tool." With it, Claude runs an honest linear regression in SQL and reports the result with appropriate uncertainty. The recipe is right in the prompt; no separate forecasting service needed.
+
+## 4. The four tools
+
+Tools are the *only* way Claude can affect the UI or read data. Adding a new capability means adding a new tool here — there's no hidden side channel. Today there are four.
+
+<ToolCatalog />
+
+A few things worth highlighting that the cards above hint at but don't shout about:
+
+**`query_data` is the workhorse.** Almost every question routes through it. The tool runs in the browser against DuckDB-WASM — the same engine that powers the dashboards. SQL is validated as read-only by parsing it through DuckDB's own `json_serialize_sql` and rejecting anything that isn't `SELECT`, `SHOW`, `DESCRIBE`, `EXPLAIN`, `PRAGMA`, or `CALL`. No `UPDATE`, `DELETE`, `INSERT`, `CREATE`, or `DROP` can get through, even if Claude were to try.
+
+**`display_visualization` reuses the dashboard tile contract.** The schema for a visualization is the same `TileConfig` schema that dashboard tiles use. That means a chart Claude builds inside the chat can be pinned to a dashboard verbatim — no conversion needed.
+
+**`propose_smb_navigation` is deliberately *not* a navigation tool.** The executor returns a card with a "Go to detail page" button. It does not call `useNavigate()` itself. This matters because SSE streams can be replayed (e.g., on reconnect), and if the tool navigated as a side effect the user would get launched across the app on every replay. The user clicks; the navigation happens.
+
+**`search_knowledge_base` is a tool, but the wiring to HubSpot is still in progress.** It exists on the LLM side so Claude knows it can be asked product/how-to questions, but the backend proxy lookup is not yet wired in production. (See "What's not yet wired" below.)
+
+## 5. The protocol: how a single message moves through the system
+
+When a user sends a message, the response comes back as a **server-sent event stream**. Each event is one of a small, fixed set of types. Below is the actual event sequence for one tool-using turn — the user asks "who's our top SMB by revenue this month?" and Claude responds with a brief acknowledgment plus a `query_data` call.
+
+Press **Play** to step through the events, or click an event to see the raw JSON.
+
+<ToolCallTimeline />
+
+A few things to absorb from that timeline:
+
+**`CUSTOM(tool-input-available)` is load-bearing.** The standard AG-UI event `TOOL_CALL_END` *announces* that the tool call is complete, but TanStack AI's `ChatClient` (the framework I use for the chat hook) won't execute a client-side tool just from that signal. It needs the `CUSTOM` event with name `tool-input-available` to fire its `onToolCall` callback. My SSE adapter always emits the `CUSTOM` event immediately after `TOOL_CALL_END` — if I ever forgot, the chat would silently stop calling tools.
+
+**The stream really does terminate with `[DONE]`.** That's the SSE protocol marker. After the stream closes, TanStack AI runs the tool client-side. When the tool finishes, TanStack AI **opens a new POST to `/v1/chat`** with the conversation now including the tool result. That kicks off a fresh stream — same events all over again. A multi-step conversation is really N independent SSE streams stitched together.
+
+**Token usage comes back in `RUN_FINISHED`.** Every turn tells you exactly how many tokens it cost. The first turn is usually the most expensive because the system prompt is huge; subsequent turns reuse it but add the conversation tail.
+
+## 6. The PII token map: how customer names never reach the LLM
+
+This is the part to dwell on if a stakeholder is worried about data privacy. The system has a strict invariant: **PII column values never leave the browser in clear text.** Not in the tool result, not in the LLM's analysis, not in the prompt. They're replaced with stable `[REDACTED_N]` tokens before the data is handed to the LLM, and re-substituted at the moment of rendering.
+
+<PiiViewer />
+
+The mechanics in plain English:
+
+- Each `DatasetDef` in `packages/schemas/src/datasets/` declares which of its fields are PII (`isPii: true`). Today that includes: company name, owner first/last name, primary owner email, phone number, employee referral contact info.
+- When `query_data` runs in the browser, the result rows are passed through `piiTokenMap.obfuscateRows(rows, columns)`. For each row, every PII column's value is replaced with `[REDACTED_N]`. The map stores a bidirectional lookup so the same value always gets the same token.
+- The redacted rows are what Claude sees as the tool result. Claude is taught, in the system prompt, to treat the tokens as opaque — never put them in a `WHERE` clause, never join on them, but use them freely in narrative text.
+- When Claude's response is rendered in `ChatMessage`, the markdown source runs through `piiTokenMap.deobfuscate(text)`. That replaces every `[REDACTED_N]` with the real value. The user sees "Acme Corp"; Claude saw `[REDACTED_1]`.
+- When the chat panel unmounts, `piiTokenMap.reset()` clears the map. Tokens don't persist across sessions.
+
+<div className="cs-callout">
+
+**Known limitation.** If Claude writes SQL like `SELECT companyName AS name FROM smbs`, the alias `name` strips the `isPii` flag on the way back through `describeColumns` — and the value is *not* tokenized. I catch the common cases in review and in the prompt ("don't alias PII columns away"), but if you're auditing the system you should know this exists. A more robust fix would be to track aliases back to their source columns through DuckDB's `EXPLAIN`. It's on the backlog.
+
+</div>
+
+## 7. Page context: how "they" resolves to the right SMB
+
+A bank employee opens an SMB detail page for Acme Corp and asks the chat: *"when did they sign up?"*
+
+"They" is ambiguous. The LLM doesn't know who they is. But the user is *standing on Acme's page*. The page itself is the disambiguator.
+
+This is handled by a small mechanism called **page context**. On every chat request, the browser includes an optional `pageContext: string` (capped at 1,000 characters by Zod) in the POST body. When the user is on `/!/small-business/$id`, the string says:
+
+> The user is currently viewing the detail page for SMB 1142 (Acme Corp). When the user refers to "them", "this business", "they", "this SMB", etc. without naming a specific business, assume they mean SMB 1142 and use smbId=1142 in any queries.
+
+The backend appends this string to the cached `basePrompt` under `## Current Page Context` for that single request. Claude reads it and "they" snaps into focus.
+
+The frontend implementation has one subtle trick that's worth understanding because it would be easy to break:
+
+- `usePageContext()` is a React hook that reads from `useMatches()` (TanStack Router) and produces the context string. It re-renders whenever the route changes.
+- But the SSE *connection object* must stay stable across route changes — `useChat` recreates the `ChatClient` if its connection identity changes, which would wipe the message history every time the user navigated.
+- So I put the current page context into a **ref**, sync the ref inside a `useEffect`, and the chat connection's per-request options callback reads `pageContextRef.current` at the moment of each `sendMessage`.
+
+The end result: the connection identity is stable (no wiped history), but every message sends fresh context. Ref-inside-stable-closure. If you ever see chat history disappearing on route changes, this is the first thing to check.
+
+## 8. Three worked examples
+
+The fastest way to internalize the system is to watch three real conversations end-to-end.
+
+### Example A — "Who's our top SMB by revenue this month?"
+
+| Step | What happens |
+|------|-------------|
+| 1 | User types the question in `ChatPanel`. `usePageContext()` returns `undefined` (they're on the home page). |
+| 2 | `sendMessage()` POSTs to `/v1/chat` with just `{ messages: [...] }` — no `pageContext`. |
+| 3 | Backend validates the JWT (`withAuth("read:chat")`), parses the body against `ChatRequestSchema`, builds the system prompt from cache, opens the Anthropic stream. |
+| 4 | Claude emits a brief text acknowledgment ("Let me check this month's payment data.") followed by a `query_data` tool call with a `SUM(amountPennies) GROUP BY smbId` query. |
+| 5 | SSE timeline: `RUN_STARTED` → `TEXT_MESSAGE_START/CONTENT/END` → `TOOL_CALL_START/ARGS/END` → `CUSTOM(tool-input-available)` → `RUN_FINISHED(finishReason: tool_calls)` → `[DONE]`. |
+| 6 | Browser runs the SQL against DuckDB-WASM. Result: one row with `smbId=1142, companyName="Acme Corp", revenue=48230`. `piiTokenMap.obfuscateRows` swaps "Acme Corp" → `[REDACTED_1]`. |
+| 7 | TanStack AI re-opens the chat stream with the conversation now including the tool result. |
+| 8 | Claude reads the (tokenized) result and writes: *"Your top SMB this month is **[REDACTED_1]** at $48,230 in revenue. That's 50% above the runner-up."* |
+| 9 | `ChatMessage` calls `piiTokenMap.deobfuscate()` on the markdown source. The user reads: *"Your top SMB this month is **Acme Corp** at $48,230 in revenue. That's 50% above the runner-up."* |
+
+Total tokens consumed: ~2,500 (first turn) + ~150 (second turn after tool result) ≈ 2,650. Wall-clock latency on a warm function: ~3 seconds.
+
+### Example B — "Forecast invoice revenue for the next 6 months"
+
+This one shows the forecasting recipe in action.
+
+| Step | What happens |
+|------|-------------|
+| 1 | User asks: "Forecast invoice revenue for the next 6 months." |
+| 2 | Claude recognizes the trigger phrase ("forecast"). The forecasting section of the system prompt has a verbatim SQL recipe with `regr_slope`, `regr_intercept`, and `generate_series`. |
+| 3 | Claude calls `query_data` with a CTE-shaped query: historical revenue per month → regression coefficients → forecast rows from `generate_series(MAX(period) + 1 month, MAX(period) + 6 months, INTERVAL 1 month)`. The output columns are `period | actual | forecast | is_forecast`. |
+| 4 | DuckDB runs the query in the browser. The read-only validator parses the SQL through `json_serialize_sql` and accepts it (it's a `SELECT_STATEMENT`, just with CTEs and window functions). Returns 18 rows: 12 historical, 6 forecast. |
+| 5 | Claude then calls `display_visualization` with `type: "chart"`, `chartType: "line"`, `xAxis: "period"`, `yAxis: "actual"` and a second `yAxis: "forecast"`. The chart renders inline with a natural null-gap between history and forecast. |
+| 6 | Claude follows up in text: *"Your invoice revenue trend is up about 3.2% month-over-month over the last year. Projecting that forward, you'd hit roughly $52K/month by November. Caveat: this is a simple linear extrapolation — anything that shifts the underlying customer mix could move the line significantly."* |
+
+The whole flow happens with no real "forecasting service" anywhere — DuckDB's built-in aggregate functions do the work. The system prompt does the rest of the work by teaching Claude *when* to reach for this pattern.
+
+### Example C — "Take me to Acme Corp"
+
+A navigation flow. The user is on `/!/dashboards/1`, so `pageContext` says they're looking at a dashboard.
+
+| Step | What happens |
+|------|-------------|
+| 1 | User types: "take me to Acme Corp". |
+| 2 | Claude does **not** know Acme Corp's `smbId` — and importantly, it's been told never to invent one. So it calls `query_data` first: `SELECT smbId, companyName FROM smbs WHERE companyName ILIKE '%acme%'`. |
+| 3 | One row comes back: `{ smbId: 1142, companyName: "[REDACTED_1]" }`. |
+| 4 | Claude composes its second turn in a specific order — *text first*, then *tool call*. Text: *"Taking you to Acme Corp — click below to confirm."* Then a `propose_smb_navigation` tool call with `{ smbId: 1142, companyName: "[REDACTED_1]" }`. |
+| 5 | The tool executor runs in the browser. It is **pure** — it returns `{ smbId: 1142, companyName: "[REDACTED_1]", path: "/!/small-business/1142" }`. It does *not* call `useNavigate()`. |
+| 6 | `ChatMessage` sees a tool output and dispatches it to `NavigateToSmbCard`. The card deobfuscates `[REDACTED_1]` back to "Acme Corp" and renders a "Go to Acme Corp" button. |
+| 7 | The user clicks the button. *Now* `useNavigate()` is called, and the router transitions to `/!/small-business/1142`. |
+
+The text-before-tool-call ordering is what makes the UX feel right: the user reads "Taking you to Acme Corp — click below to confirm" and *then* sees the card directly below the text. If the order were reversed, "below" would be a lie.
+
+## 9. Failure modes and guardrails
+
+This is the part to read if you're worried about what could go wrong.
+
+| Concern | Guardrail |
+|---------|-----------|
+| Claude writes a destructive SQL statement | `assertReadOnly` parses the SQL through DuckDB's own `json_serialize_sql` and rejects anything that isn't `SELECT`/`SHOW`/`DESCRIBE`/`EXPLAIN`/`PRAGMA`/`CALL`. Enforced **client-side**, before the query ever reaches DuckDB. |
+| Claude returns a 10,000-row table | `query_data` truncates to 50 rows and sets `truncated: true`. The LLM sees both and can refine the query. |
+| Claude leaks PII | Three layers: (a) `isPii` flag in the schema, (b) `obfuscateRows` runs *before* the result leaves the browser, (c) `deobfuscate` runs *only* on the markdown source at render time. Claude never sees real values, the user never sees tokens. |
+| Page context becomes a backdoor for prompt injection | `pageContext` is Zod-capped at 1,000 chars. The value is constructed by *my* router code from route loader data; it's not user-typed. A user can't smuggle prompt content into it via URL params. |
+| Token exhaustion | First turn is ~2,500 tokens (system prompt heavy); follow-ups average ~150-400. With `claude-sonnet-4-6` and a 200K context window this is fine. Long conversations cost more, but Anthropic's prompt caching handles the system prompt portion. |
+| BigInt JSON serialization | DuckDB returns `BigInt` for integer columns. I coerce to `Number` with a JSON replacer in `queryData.ts` before sending the result to the LLM. Values larger than `Number.MAX_SAFE_INTEGER` (~9 quadrillion) would lose precision — not a real concern for cents-denominated dollar amounts. |
+| Unauthorized access | `withAuth("read:chat", REQUIRED_ENV, handler)` middleware on the Azure Function validates the JWT (Auth0) and checks for the `read:chat` permission. Without it, the request never reaches the chat handler. |
+| Anthropic outage | The Foundry SDK throws; the Azure Function emits a `RUN_ERROR` event and then `[DONE]`. The frontend surfaces a friendly error in the chat panel. No retry logic today — the user can simply try again. |
+
+---
+
+*Written for a semi-technical audience in May 2026. The mocks above are faithful to the real system; the company names and dollar figures are fabricated.*
+
+</div>
